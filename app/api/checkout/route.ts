@@ -20,7 +20,7 @@ type CartRow = {
   size: string;
   color: string;
   product_id: string;
-  products: { id: string; name: string; price: number; image_url: string; is_active: boolean } | null;
+  products: { id: string; name: string; price: number; image_url: string; is_active: boolean; stock: number } | null;
 };
 
 function bad(message: string, status = 400) {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   const { data: cartRows, error: cartError } = await admin
     .from('cart_items')
-    .select('quantity, size, color, product_id, products(id, name, price, image_url, is_active)')
+    .select('quantity, size, color, product_id, products(id, name, price, image_url, is_active, stock)')
     .eq('user_id', user.id)
     .returns<CartRow[]>();
 
@@ -75,6 +75,20 @@ export async function POST(request: Request) {
 
   const lines = (cartRows ?? []).filter((r) => r.products && r.products.is_active);
   if (lines.length === 0) return bad('Your cart is empty.');
+
+  // Stock check: add up each product across sizes/colours and compare to what's left
+  const wanted = new Map<string, { name: string; qty: number; stock: number }>();
+  for (const r of lines) {
+    const w = wanted.get(r.product_id) ?? { name: r.products!.name, qty: 0, stock: r.products!.stock };
+    w.qty += r.quantity;
+    wanted.set(r.product_id, w);
+  }
+  for (const w of Array.from(wanted.values())) {
+    if (w.stock <= 0) return bad(`${w.name} is sold out. Please remove it from your cart.`, 409);
+    if (w.qty > w.stock) {
+      return bad(`Only ${w.stock} of ${w.name} left. Please reduce the quantity in your cart.`, 409);
+    }
+  }
 
   const subtotal = lines.reduce((sum, r) => sum + r.products!.price * r.quantity, 0);
   const shippingFee = SHIPPING_FEE;

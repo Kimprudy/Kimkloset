@@ -48,11 +48,12 @@ export default function Header() {
             <Image src="/brand/wordmark.png" alt="Kimkloset" width={447} height={62} priority className="h-5 w-auto sm:h-6" />
           </Link>
 
-          <nav className="hidden items-center gap-8 text-sm font-semibold text-brand-700 md:flex">
+          <nav className="hidden items-center gap-7 text-sm font-semibold text-brand-700 lg:flex">
             <Link href="/#shop" className="transition hover:text-ink">Shop</Link>
             <Link href="/?category=Dresses#shop" className="transition hover:text-ink">Dresses</Link>
             <Link href="/?category=Tops#shop" className="transition hover:text-ink">Tops</Link>
-            <Link href="/?category=Outerwear#shop" className="transition hover:text-ink">Outerwear</Link>
+            <Link href="/?category=Sets#shop" className="transition hover:text-ink">Sets</Link>
+            <Link href="/?category=Jumpsuits#shop" className="transition hover:text-ink">Jumpsuits</Link>
             <Link href="/?category=Shapewear#shop" className="transition hover:text-ink">Shapewear</Link>
           </nav>
 

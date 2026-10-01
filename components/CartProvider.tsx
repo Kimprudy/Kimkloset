@@ -48,7 +48,7 @@ type DbCartRow = {
   size: string;
   color: string;
   quantity: number;
-  products: { slug: string; name: string; price: number; image_url: string; is_active: boolean } | null;
+  products: { slug: string; name: string; price: number; image_url: string; is_active: boolean; stock: number } | null;
 };
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
@@ -57,6 +57,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const userRef = useRef<User | null>(null);
+  const itemsRef = useRef<CartItem[]>([]);
+  itemsRef.current = items;
   const initialised = useRef(false);
 
   // ---------- signed-in cart (Supabase) ----------
@@ -64,7 +66,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     async (userId: string): Promise<CartItem[]> => {
       const { data, error } = await supabase
         .from('cart_items')
-        .select('id, product_id, size, color, quantity, products(slug, name, price, image_url, is_active)')
+        .select('id, product_id, size, color, quantity, products(slug, name, price, image_url, is_active, stock)')
         .eq('user_id', userId)
         .order('created_at', { ascending: true })
         .returns<DbCartRow[]>();
@@ -81,6 +83,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           size: r.size,
           color: r.color,
           quantity: r.quantity,
+          stock: r.products!.stock,
         }));
     },
     [supabase]
@@ -167,13 +170,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addItem = useCallback(
     async (product: Product, size: string, color: string, quantity = 1) => {
       const u = userRef.current;
+      if (product.stock <= 0) throw new Error('SOLD_OUT');
+      const cap = Math.min(MAX_QTY, product.stock);
 
       if (!u) {
         const current = readLocal();
         const key = localKey(product.id, size, color);
         const found = current.find((i) => i.key === key);
         const next = found
-          ? current.map((i) => (i.key === key ? { ...i, quantity: Math.min(MAX_QTY, i.quantity + quantity) } : i))
+          ? current.map((i) => (i.key === key ? { ...i, quantity: Math.min(cap, i.quantity + quantity), stock: product.stock } : i))
           : [
               ...current,
               {
@@ -185,7 +190,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 image_url: product.image_url,
                 size,
                 color,
-                quantity: Math.min(MAX_QTY, quantity),
+                quantity: Math.min(cap, quantity),
+                stock: product.stock,
               },
             ];
         writeLocal(next);
@@ -206,11 +212,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const { error } = existing
         ? await supabase
             .from('cart_items')
-            .update({ quantity: Math.min(MAX_QTY, existing.quantity + quantity), updated_at: new Date().toISOString() })
+            .update({ quantity: Math.min(cap, existing.quantity + quantity), updated_at: new Date().toISOString() })
             .eq('id', existing.id)
         : await supabase
             .from('cart_items')
-            .insert({ user_id: u.id, product_id: product.id, size, color, quantity: Math.min(MAX_QTY, quantity) });
+            .insert({ user_id: u.id, product_id: product.id, size, color, quantity: Math.min(cap, quantity) });
       if (error) throw error;
 
       setItems(await fetchDbCart(u.id));
@@ -238,7 +244,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const updateQuantity = useCallback(
     async (key: string, quantity: number) => {
       if (quantity < 1) return removeItem(key);
-      const qty = Math.min(MAX_QTY, quantity);
+      const known = itemsRef.current.find((i) => i.key === key)?.stock;
+      const qty = Math.min(MAX_QTY, known ?? MAX_QTY, quantity);
       const u = userRef.current;
       setItems((prev) => prev.map((i) => (i.key === key ? { ...i, quantity: qty } : i)));
       if (!u) {

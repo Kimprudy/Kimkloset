@@ -8,11 +8,13 @@ export default function QuantityStepper({
   onChange,
   disabled,
   size = 'md',
+  max = MAX_QTY,
 }: {
   value: number;
   onChange: (next: number) => void;
   disabled?: boolean;
   size?: 'sm' | 'md';
+  max?: number;
 }) {
   const box = size === 'sm' ? 'h-8 w-8' : 'h-11 w-11';
   return (
@@ -32,7 +34,7 @@ export default function QuantityStepper({
       <button
         type="button"
         onClick={() => onChange(value + 1)}
-        disabled={disabled || value >= MAX_QTY}
+        disabled={disabled || value >= Math.min(MAX_QTY, max)}
         className={`${box} flex items-center justify-center rounded-full hover:bg-brand-50 disabled:opacity-40`}
         aria-label="Increase quantity"
       >

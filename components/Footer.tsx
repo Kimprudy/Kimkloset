@@ -21,6 +21,8 @@ export default function Footer() {
           <ul className="mt-4 space-y-2 text-sm text-white/70">
             <li><Link href="/?category=Dresses#shop" className="hover:text-white">Dresses</Link></li>
             <li><Link href="/?category=Tops#shop" className="hover:text-white">Tops</Link></li>
+            <li><Link href="/?category=Sets#shop" className="hover:text-white">Sets</Link></li>
+            <li><Link href="/?category=Jumpsuits#shop" className="hover:text-white">Jumpsuits</Link></li>
             <li><Link href="/?category=Outerwear#shop" className="hover:text-white">Outerwear</Link></li>
             <li><Link href="/?category=Shapewear#shop" className="hover:text-white">Shapewear</Link></li>
           </ul>

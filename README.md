@@ -105,6 +105,7 @@ kimkloset/
 1. Supabase → your project → **SQL Editor** → **New query**.
 2. Paste all of `supabase/01_schema.sql` → **Run**.
 3. New query → paste all of `supabase/02_seed_products.sql` → **Run**.
+   Then do the same with `supabase/04_stock_and_new_products.sql` (stock tracking + more products).
 4. **Authentication → URL Configuration**:
    - Site URL: `http://localhost:3000` (change it to your Vercel URL after deploying).
    - Redirect URLs → add `http://localhost:3000/**`.
@@ -188,3 +189,16 @@ Open http://localhost:3000
 **Using SQL instead:** copy `supabase/03_add_product_template.sql`, change the values and run it.
 
 **To remove an item**, set `is_active` to `false`. This keeps old orders intact.
+
+---
+
+## 10. Stock
+
+Every product has a **stock** number (Table Editor → `products` → `stock`).
+
+- When an order is **paid**, stock goes down automatically. For example, 50 white gowns minus 2 sold leaves 48.
+- At 5 or fewer, the site shows **"Only X left"**. At 0 it shows **Sold out** and the Add to Cart button is disabled.
+- Checkout refuses to take payment if someone's cart has more than you have left.
+- To restock, type the new number in the `stock` cell.
+
+Stock is counted per product, not per size.

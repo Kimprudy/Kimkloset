@@ -7,6 +7,7 @@ import { Loader2, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCart } from '@/components/CartProvider';
 import { cn, formatNaira } from '@/lib/format';
+import { LOW_STOCK } from '@/lib/config';
 import type { Product } from '@/lib/types';
 
 export default function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
@@ -15,6 +16,8 @@ export default function ProductCard({ product, priority = false }: { product: Pr
   const [adding, setAdding] = useState(false);
   const [needsSize, setNeedsSize] = useState(false);
   const color = product.colors[0] ?? '';
+  const soldOut = product.stock <= 0;
+  const lowStock = !soldOut && product.stock <= LOW_STOCK;
 
   async function handleAdd() {
     if (product.sizes.length > 0 && !size) {
@@ -30,7 +33,7 @@ export default function ProductCard({ product, priority = false }: { product: Pr
       });
     } catch (err) {
       console.error(err);
-      toast.error('Could not add to cart. Please try again.');
+      toast.error(err instanceof Error && err.message === 'SOLD_OUT' ? 'Sorry, this piece is sold out.' : 'Could not add to cart. Please try again.');
     } finally {
       setAdding(false);
     }
@@ -48,8 +51,21 @@ export default function ProductCard({ product, priority = false }: { product: Pr
           fill
           priority={priority}
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          className="object-cover object-[center_30%] transition duration-500 group-hover:scale-[1.04]"
+          className={cn(
+            'object-cover object-[center_30%] transition duration-500 group-hover:scale-[1.04]',
+            soldOut && 'opacity-50 grayscale'
+          )}
         />
+        {soldOut && (
+          <span className="absolute bottom-3 left-3 rounded-full bg-ink px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
+            Sold out
+          </span>
+        )}
+        {lowStock && (
+          <span className="absolute bottom-3 left-3 rounded-full bg-brand-500 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink">
+            Only {product.stock} left
+          </span>
+        )}
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider">
           {product.category}
         </span>
@@ -96,9 +112,9 @@ export default function ProductCard({ product, priority = false }: { product: Pr
           </div>
         )}
 
-        <button onClick={handleAdd} disabled={adding} className="btn-primary mt-3 w-full !py-2.5">
+        <button onClick={handleAdd} disabled={adding || soldOut} className="btn-primary mt-3 w-full !py-2.5">
           {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBag className="h-4 w-4" />}
-          {adding ? 'Adding…' : 'Add to Cart'}
+          {soldOut ? 'Sold out' : adding ? 'Adding…' : 'Add to Cart'}
         </button>
       </div>
     </article>

@@ -8,6 +8,8 @@ export type Product = {
   sizes: string[];
   colors: string[];
   image_url: string;
+  /** Pieces left. 0 = sold out */
+  stock: number;
 };
 
 export type CartItem = {
@@ -21,6 +23,8 @@ export type CartItem = {
   size: string;
   color: string;
   quantity: number;
+  /** Pieces left (known for signed-in carts) */
+  stock?: number;
 };
 
 export type OrderStatus = 'pending' | 'paid' | 'failed' | 'cancelled';

@@ -8,7 +8,10 @@ export const SHIPPING_FEE = 3000;
 export const CURRENCY = 'NGN';
 export const MAX_QTY = 10;
 
-export const CATEGORIES = ['Dresses', 'Tops', 'Outerwear', 'Shapewear'] as const;
+export const CATEGORIES = ['Dresses', 'Tops', 'Sets', 'Jumpsuits', 'Outerwear', 'Shapewear'] as const;
+
+// Show "Only X left" when stock is at or below this number
+export const LOW_STOCK = 5;
 
 export const NIGERIAN_STATES = [
   'Abia', 'Abuja (FCT)', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',

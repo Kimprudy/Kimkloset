@@ -9,6 +9,7 @@ import EmptyState from '@/components/EmptyState';
 import OrderTotals from '@/components/OrderTotals';
 import QuantityStepper from '@/components/QuantityStepper';
 import { formatNaira } from '@/lib/format';
+import { LOW_STOCK } from '@/lib/config';
 
 export default function CartPage() {
   const { items, subtotal, count, loading, user, updateQuantity, removeItem } = useCart();
@@ -73,12 +74,20 @@ export default function CartPage() {
                       {[item.size && `Size ${item.size}`, item.color].filter(Boolean).join(' · ')}
                     </p>
                     <p className="mt-1 text-sm text-ink/60">{formatNaira(item.price)} each</p>
+                    {item.stock !== undefined && item.stock <= 0 ? (
+                      <p className="mt-1 text-xs font-semibold text-red-600">Sold out — please remove this item</p>
+                    ) : item.stock !== undefined && item.quantity > item.stock ? (
+                      <p className="mt-1 text-xs font-semibold text-red-600">Only {item.stock} left — please reduce the quantity</p>
+                    ) : item.stock !== undefined && item.stock <= LOW_STOCK ? (
+                      <p className="mt-1 text-xs font-semibold text-brand-700">Only {item.stock} left</p>
+                    ) : null}
                   </div>
                   <p className="shrink-0 font-bold">{formatNaira(item.price * item.quantity)}</p>
                 </div>
                 <div className="mt-auto flex items-center justify-between pt-3">
                   <QuantityStepper
                     size="sm"
+                    max={item.stock}
                     value={item.quantity}
                     onChange={(n) => safely(() => updateQuantity(item.key, n))}
                   />

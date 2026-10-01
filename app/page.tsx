@@ -15,10 +15,10 @@ export const dynamic = 'force-dynamic';
 const HERO_MAIN = 'ivory-feather-cuff-cutout-dress';
 const HERO_SIDE = ['black-plunge-backless-bodysuit', 'sage-satin-ruched-maxi-dress'];
 const CATEGORY_COVERS: Record<string, string> = {
-  Dresses: 'midnight-lace-satin-midi-dress',
-  Tops: 'indigo-denim-corset-top',
-  Outerwear: 'noir-sculpted-blazer-dress',
-  Shapewear: 'black-plunge-backless-bodysuit',
+  Dresses: 'tangerine-floral-corset-mini-dress',
+  Tops: 'olive-lace-up-crop-top',
+  Sets: 'black-satin-corset-burgundy-sequin-skirt-set',
+  Jumpsuits: 'grey-denim-corset-jumpsuit',
 };
 
 export default async function HomePage() {

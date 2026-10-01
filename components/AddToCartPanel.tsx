@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useCart } from '@/components/CartProvider';
 import QuantityStepper from '@/components/QuantityStepper';
 import { cn } from '@/lib/format';
+import { LOW_STOCK, MAX_QTY } from '@/lib/config';
 import type { Product } from '@/lib/types';
 
 export default function AddToCartPanel({ product }: { product: Product }) {
@@ -17,6 +18,8 @@ export default function AddToCartPanel({ product }: { product: Product }) {
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
   const [sizeError, setSizeError] = useState(false);
+  const soldOut = product.stock <= 0;
+  const maxQty = Math.max(1, Math.min(MAX_QTY, product.stock));
 
   async function handleAdd() {
     if (product.sizes.length > 0 && !size) {
@@ -30,7 +33,7 @@ export default function AddToCartPanel({ product }: { product: Product }) {
       toast.success(`${product.name} added to your cart`);
     } catch (err) {
       console.error(err);
-      toast.error('Could not add to cart. Please try again.');
+      toast.error(err instanceof Error && err.message === 'SOLD_OUT' ? 'Sorry, this piece is sold out.' : 'Could not add to cart. Please try again.');
     } finally {
       setAdding(false);
     }
@@ -88,11 +91,16 @@ export default function AddToCartPanel({ product }: { product: Product }) {
 
       <div>
         <p className="label">Quantity</p>
-        <QuantityStepper value={qty} onChange={(n) => setQty(Math.max(1, n))} />
+        <QuantityStepper value={qty} max={maxQty} disabled={soldOut} onChange={(n) => setQty(Math.min(maxQty, Math.max(1, n)))} />
+        {soldOut ? (
+          <p className="mt-2 text-sm font-semibold text-ink/60">Sold out — check back soon or DM us on Instagram.</p>
+        ) : product.stock <= LOW_STOCK ? (
+          <p className="mt-2 text-sm font-semibold text-brand-700">Only {product.stock} left — don&apos;t miss it.</p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <button onClick={handleAdd} disabled={adding} className="btn-primary flex-1 !py-4">
+        <button onClick={handleAdd} disabled={adding || soldOut} className="btn-primary flex-1 !py-4">
           {adding ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : added ? (
@@ -100,7 +108,7 @@ export default function AddToCartPanel({ product }: { product: Product }) {
           ) : (
             <ShoppingBag className="h-4 w-4" />
           )}
-          {adding ? 'Adding…' : added ? 'Added — add another' : 'Add to Cart'}
+          {soldOut ? 'Sold out' : adding ? 'Adding…' : added ? 'Added — add another' : 'Add to Cart'}
         </button>
         {added && (
           <Link href="/cart" className="btn-pink flex-1 !py-4">

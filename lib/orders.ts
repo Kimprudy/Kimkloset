@@ -68,7 +68,9 @@ export async function finalizeOrder(reference: string): Promise<FinalizeResult> 
       .maybeSingle<Order>();
 
     if (updated) {
-      // First time we've seen this payment: empty the customer's cart
+      // First time we've seen this payment: reduce stock, then empty the customer's cart
+      const { error: stockError } = await admin.rpc('decrement_stock_for_order', { p_order_id: order.id });
+      if (stockError) console.error('[finalizeOrder] stock update failed', stockError);
       await admin.from('cart_items').delete().eq('user_id', order.user_id);
     }
 

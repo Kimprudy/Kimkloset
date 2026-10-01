@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import type { Product } from '@/lib/types';
 
-const PRODUCT_FIELDS = 'id, slug, name, description, price, category, sizes, colors, image_url';
+const PRODUCT_FIELDS = 'id, slug, name, description, price, category, sizes, colors, image_url, stock';
 
 export async function getProducts(): Promise<{ products: Product[]; error: string | null }> {
   try {
