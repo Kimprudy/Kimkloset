@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestUser } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { initializeTransaction } from '@/lib/paystack';
 import { generateOrderNumber } from '@/lib/orders';
 import { SHIPPING_FEE, siteUrl } from '@/lib/config';
+import { isAllowedReturnUrl } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,8 @@ type CheckoutBody = {
   address?: string;
   city?: string;
   state?: string;
+  /** Mobile app only: deep link to send the customer back to after Paystack */
+  returnUrl?: string;
 };
 
 type CartRow = {
@@ -29,16 +32,13 @@ function bad(message: string, status = 400) {
 
 /**
  * POST /api/checkout
- * 1. Checks who is logged in
+ * 1. Checks who is logged in (web cookie, or mobile `Authorization: Bearer <token>`)
  * 2. Reads THEIR cart from the database and recalculates prices (never trusts the browser)
  * 3. Saves a "pending" order
  * 4. Asks Paystack for a payment link and returns it
  */
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user } = await getRequestUser(request);
   if (!user || !user.email) return bad('Please sign in to check out.', 401);
 
   let body: CheckoutBody;
@@ -59,6 +59,7 @@ export async function POST(request: Request) {
   if (address.length < 5) return bad('Please enter your delivery address.');
   if (city.length < 2) return bad('Please enter your city.');
   if (!state) return bad('Please choose your state.');
+  if (body.returnUrl !== undefined && !isAllowedReturnUrl(body.returnUrl)) return bad('Invalid return link.');
 
   const admin = createAdminClient();
 
@@ -144,15 +145,19 @@ export async function POST(request: Request) {
   // Remember name/phone for next time
   await admin.from('profiles').update({ full_name: fullName, phone, updated_at: new Date().toISOString() }).eq('id', user.id);
 
-  // Send Paystack back to whichever site the customer is on (localhost or Vercel)
+  // Web: send Paystack back to whichever site the customer is on (localhost or Vercel).
+  // Mobile: go through our mobile-return route, which confirms the order then opens the app.
   const origin = request.headers.get('origin') || siteUrl();
+  const callbackUrl = body.returnUrl
+    ? `${siteUrl()}/api/checkout/mobile-return?to=${encodeURIComponent(body.returnUrl)}&reference=${encodeURIComponent(orderNumber)}`
+    : `${origin}/checkout/success`;
 
   try {
     const payment = await initializeTransaction({
       email: user.email,
       amountKobo: total * 100,
       reference: orderNumber,
-      callbackUrl: `${origin}/checkout/success`,
+      callbackUrl,
       metadata: { order_id: order.id, user_id: user.id, store: 'Kimkloset' },
     });
     return NextResponse.json({ authorizationUrl: payment.authorization_url, orderNumber });
