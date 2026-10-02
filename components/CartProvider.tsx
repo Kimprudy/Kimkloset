@@ -42,14 +42,18 @@ function writeLocal(items: CartItem[]) {
 }
 const localKey = (productId: string, size: string, color: string) => `${productId}|${size}|${color}`;
 
-type DbCartRow = {
-  id: string;
-  product_id: string;
-  size: string;
-  color: string;
-  quantity: number;
-  products: { slug: string; name: string; price: number; image_url: string; is_active: boolean; stock: number } | null;
-};
+// ---------- signed-in cart (shared /api/cart endpoints, same as the mobile app) ----------
+async function cartRequest(path: string, method = 'GET', body?: unknown): Promise<CartItem[]> {
+  const res = await fetch(path, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `Cart request failed (${res.status})`);
+  return json.items as CartItem[];
+}
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
@@ -61,76 +65,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   itemsRef.current = items;
   const initialised = useRef(false);
 
-  // ---------- signed-in cart (Supabase) ----------
-  const fetchDbCart = useCallback(
-    async (userId: string): Promise<CartItem[]> => {
-      const { data, error } = await supabase
-        .from('cart_items')
-        .select('id, product_id, size, color, quantity, products(slug, name, price, image_url, is_active, stock)')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true })
-        .returns<DbCartRow[]>();
-      if (error) throw error;
-      return (data ?? [])
-        .filter((r) => r.products && r.products.is_active)
-        .map((r) => ({
-          key: r.id,
-          product_id: r.product_id,
-          slug: r.products!.slug,
-          name: r.products!.name,
-          price: r.products!.price,
-          image_url: r.products!.image_url,
-          size: r.size,
-          color: r.color,
-          quantity: r.quantity,
-          stock: r.products!.stock,
-        }));
-    },
-    [supabase]
-  );
+  const fetchDbCart = useCallback(() => cartRequest('/api/cart'), []);
 
   // When a guest signs in, move their browser cart into their account
-  const mergeGuestCart = useCallback(
-    async (userId: string) => {
-      const guestItems = readLocal();
-      if (guestItems.length === 0) return;
-      writeLocal([]); // clear first so a second auth event can't merge twice
+  // (POST adds to any matching line and caps at stock / MAX_QTY)
+  const mergeGuestCart = useCallback(async () => {
+    const guestItems = readLocal();
+    if (guestItems.length === 0) return;
+    writeLocal([]); // clear first so a second auth event can't merge twice
 
-      const { data: existing } = await supabase
-        .from('cart_items')
-        .select('id, product_id, size, color, quantity')
-        .eq('user_id', userId);
-
-      for (const g of guestItems) {
-        const match = existing?.find(
-          (e) => e.product_id === g.product_id && e.size === g.size && e.color === g.color
-        );
-        if (match) {
-          await supabase
-            .from('cart_items')
-            .update({ quantity: Math.min(MAX_QTY, match.quantity + g.quantity), updated_at: new Date().toISOString() })
-            .eq('id', match.id);
-        } else {
-          await supabase.from('cart_items').insert({
-            user_id: userId,
-            product_id: g.product_id,
-            size: g.size,
-            color: g.color,
-            quantity: Math.min(MAX_QTY, g.quantity),
-          });
-        }
+    for (const g of guestItems) {
+      try {
+        await cartRequest('/api/cart', 'POST', { productId: g.product_id, size: g.size, color: g.color, quantity: g.quantity });
+      } catch (err) {
+        console.warn('[cart] could not merge', g.name, err); // e.g. sold out since it was added
       }
-    },
-    [supabase]
-  );
+    }
+  }, []);
 
   const loadFor = useCallback(
     async (u: User | null) => {
       setLoading(true);
       try {
         if (u) {
-          await mergeGuestCart(u.id);
-          setItems(await fetchDbCart(u.id));
+          await mergeGuestCart();
+          setItems(await fetchDbCart());
         } else {
           setItems(readLocal());
         }
@@ -167,6 +126,39 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     await loadFor(userRef.current);
   }, [loadFor]);
 
+  // Live sync: when this user's cart changes anywhere (another tab, the mobile app, checkout),
+  // refetch it. We don't build state from the event itself because delete events only carry the id.
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reload = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        fetchDbCart()
+          .then((next) => {
+            if (userRef.current?.id === userId) setItems(next);
+          })
+          .catch((err) => console.error('[cart] live refresh failed', err));
+      }, 250);
+    };
+    const filter = `user_id=eq.${userId}`;
+    const channel = supabase
+      .channel(`cart-${userId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cart_items', filter }, reload)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cart_items', filter }, reload)
+      // Supabase can't filter delete events, so only react if the deleted row is one of ours
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cart_items' }, (payload) => {
+        const id = (payload.old as { id?: string }).id;
+        if (!id || itemsRef.current.some((i) => i.key === id)) reload();
+      })
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, userId, fetchDbCart]);
+
   const addItem = useCallback(
     async (product: Product, size: string, color: string, quantity = 1) => {
       const u = userRef.current;
@@ -199,29 +191,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data: existing, error: findError } = await supabase
-        .from('cart_items')
-        .select('id, quantity')
-        .eq('user_id', u.id)
-        .eq('product_id', product.id)
-        .eq('size', size)
-        .eq('color', color)
-        .maybeSingle();
-      if (findError) throw findError;
-
-      const { error } = existing
-        ? await supabase
-            .from('cart_items')
-            .update({ quantity: Math.min(cap, existing.quantity + quantity), updated_at: new Date().toISOString() })
-            .eq('id', existing.id)
-        : await supabase
-            .from('cart_items')
-            .insert({ user_id: u.id, product_id: product.id, size, color, quantity: Math.min(cap, quantity) });
-      if (error) throw error;
-
-      setItems(await fetchDbCart(u.id));
+      setItems(await cartRequest('/api/cart', 'POST', { productId: product.id, size, color, quantity }));
     },
-    [supabase, fetchDbCart]
+    []
   );
 
   const removeItem = useCallback(
@@ -232,13 +204,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         writeLocal(readLocal().filter((i) => i.key !== key));
         return;
       }
-      const { error } = await supabase.from('cart_items').delete().eq('id', key);
-      if (error) {
-        setItems(await fetchDbCart(u.id));
-        throw error;
+      try {
+        setItems(await cartRequest(`/api/cart/${encodeURIComponent(key)}`, 'DELETE'));
+      } catch (err) {
+        setItems(await fetchDbCart());
+        throw err;
       }
     },
-    [supabase, fetchDbCart]
+    [fetchDbCart]
   );
 
   const updateQuantity = useCallback(
@@ -252,16 +225,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         writeLocal(readLocal().map((i) => (i.key === key ? { ...i, quantity: qty } : i)));
         return;
       }
-      const { error } = await supabase
-        .from('cart_items')
-        .update({ quantity: qty, updated_at: new Date().toISOString() })
-        .eq('id', key);
-      if (error) {
-        setItems(await fetchDbCart(u.id));
-        throw error;
+      try {
+        setItems(await cartRequest(`/api/cart/${encodeURIComponent(key)}`, 'PATCH', { quantity: qty }));
+      } catch (err) {
+        setItems(await fetchDbCart());
+        throw err;
       }
     },
-    [supabase, fetchDbCart, removeItem]
+    [fetchDbCart, removeItem]
   );
 
   const signOut = useCallback(async () => {
