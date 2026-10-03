@@ -6,6 +6,7 @@ import { useFonts } from 'expo-font';
 import { CormorantGaramond_600SemiBold, CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 
+import { AuthProvider } from '@/lib/auth';
 import { colors } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -27,11 +28,13 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <>
+    <AuthProvider>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.white } }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="auth/callback" />
       </Stack>
-    </>
+    </AuthProvider>
   );
 }
