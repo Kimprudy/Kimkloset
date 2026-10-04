@@ -1,56 +1,102 @@
-# Welcome to your Expo app 👋
+# Kimkloset mobile app (HNG Stage 3)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The Kimkloset store as an iPhone and Android app. It uses **the same backend and the same API endpoints as the website** (https://kimkloset.vercel.app), so one account sees the same cart and orders on both, and the cart syncs instantly between them.
 
-## Get started
+Built with Expo SDK 57 (React Native, TypeScript, expo-router) and Supabase.
 
-1. Install dependencies
+## Open the app (for reviewers)
 
-   ```bash
-   npm install
-   ```
+| Phone | How |
+|---|---|
+| **Android** | Open **https://expo.dev/accounts/kimprudy/projects/kimkloset/builds/f7741c5f-03ae-4161-9ffa-ec8c0e5c2e08** on the phone and tap **Install** (or scan its QR code), or download the APK directly: https://expo.dev/artifacts/eas/TW-BKja6UPWWfBkRUaOAYJKqv1vuoOtJpMq4mk5ZnN4.apk. Allow "install unknown apps" when Android asks. |
+| **iPhone or Android, with Expo Go** | Install **Expo Go** from the App Store / Play Store, then open this link on the phone, or scan the QR code on the update page: **https://expo.dev/accounts/kimprudy/projects/kimkloset/updates/2ddf9ac2-91e3-4577-9dc1-0d9dc2664270** |
 
-2. Start the app
+Test payment (Paystack test mode): card `4084 0840 8408 4081`, any future expiry, CVV `408`, PIN `0000`, OTP `123456`. On Paystack's test page you can also simply choose **Success**.
 
-   ```bash
-   npx expo start
-   ```
+### What to try
 
-In the output, you'll find options to open the app in a
+1. **Same account on web and mobile.** Sign in on the website and in the app with the same email/password or Google account.
+2. **Instant cart sync.** Add an item on the website: it appears in the app's Cart (and the tab badge) within a second or two, without refreshing. Change a quantity or remove an item in the app: the website cart updates by itself.
+3. **Checkout on the phone.** Cart → Checkout → Pay. After paying, the cart is emptied on both, and the order shows in the app's **Orders** tab and on the website's **My orders**.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## What's in the app
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- **Shop:** search, category chips, 2-column grid, "Only X left" / "Sold out" labels, pull to refresh.
+- **Product:** colour and size chips, quantity stepper capped at the stock left (max 10), Add to Cart. Guests can browse; adding asks them to sign in, then adds the item they picked.
+- **Cart:** plus/minus, remove, subtotal, flat ₦3,000 delivery, total. Live-synced with the website.
+- **Checkout:** name, phone, address, city and a picker for the 36 states + FCT, then Paystack in a secure in-app browser sheet.
+- **Orders:** every order from the website and the app, with status and details.
+- **Account:** sign in / create account with email and password or Google; sign out.
+- Every screen has loading, empty and error states.
 
-## Get a fresh project
+## How it works
 
-When you're ready, run:
+### Same endpoints as the website
+
+The website (Next.js, in the repo root) exposes these routes. The website's own cart uses them too, and each one accepts either the website's login cookie or `Authorization: Bearer <Supabase access token>` from the app (`lib/auth.ts → getRequestUser`). Database calls run as that user, so Supabase Row Level Security still applies.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/products` | Active products |
+| `GET /api/cart`, `POST /api/cart` | Read the cart; add an item (quantity capped at stock and 10) |
+| `PATCH /api/cart/[id]`, `DELETE /api/cart/[id]` | Change quantity; remove |
+| `GET /api/orders` | The user's orders with items |
+| `POST /api/checkout` | Creates a pending order from the cart (prices re-checked on the server) and returns the Paystack link. The app sends a `returnUrl` deep link; only `kimkloset://` and `exp://` links are accepted |
+| `GET /api/checkout/mobile-return` | Where Paystack sends the app's customers: confirms the payment on the server, then opens the app |
+| `GET /api/orders/verify?reference=` | The app asks for the result after paying (owner only) |
+
+### Instant sync
+
+Supabase Realtime is enabled on `cart_items`. The website and the app both subscribe to changes on the signed-in user's rows and, on any change, refetch `GET /api/cart`. (They refetch instead of using the event data because delete events only carry the row id.)
+
+### Sign-in
+
+Email/password via `supabase-js`. Google uses `signInWithOAuth` with `skipBrowserRedirect`, opens the page with `WebBrowser.openAuthSessionAsync`, then `exchangeCodeForSession` (PKCE). Supabase → Authentication → URL Configuration → Redirect URLs must include `kimkloset://**` and `exp://**`.
+
+### Security
+
+- The app only has public values (Supabase URL, anon key, website URL). The Supabase service role key and the Paystack secret key live only on the server (Vercel).
+- Prices, stock and payment status are always checked on the server, never trusted from the app.
+
+## Run it yourself
 
 ```bash
-npm run reset-project
+cd mobile
+npm install
+cp .env.example .env   # then fill in the values (public ones only)
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Scan the QR code with the iPhone Camera app (or with Expo Go on Android).
 
-### Other setup steps
+`.env`:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```
+EXPO_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
+EXPO_PUBLIC_API_URL=https://kimkloset.vercel.app
+```
 
-## Learn more
+**Google sign-in while developing:** Supabase drops `exp://` return links that use a raw IP address (Expo Go's default), and sends you to the website instead. Start Expo with a named address so it works:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+REACT_NATIVE_PACKAGER_HOSTNAME=$(scutil --get LocalHostName).local npx expo start   # macOS
+# or
+npx expo start --tunnel
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Checks: `npx tsc --noEmit`, `npx expo lint`, `npx expo-doctor`.
 
-## Join the community
+## Publish
 
-Join our community of developers creating universal apps.
+The cloud builds read the three `EXPO_PUBLIC_*` values from the EAS **preview** environment (`npx eas-cli env:list --environment preview`), because `.env` is not uploaded.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+# Update for Expo Go (iPhone and Android)
+npx eas-cli update --channel preview --environment preview --message "What changed"
+
+# Android APK
+npx eas-cli build -p android --profile preview
+```
+
+An iPhone install file (TestFlight) needs a paid Apple Developer account, so iPhone reviewers use Expo Go.

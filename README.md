@@ -4,6 +4,8 @@ A complete e-commerce site for **Kimkloset**, a women's fashion store in Nigeria
 
 Visitor → Browse → Add to cart → Sign in (email or Google) → Cart saved to account → Checkout → Pay with Paystack → Order saved in Supabase → Confirmation email via Mailgun → Order confirmation page → "My orders".
 
+**Stage 3: mobile app.** The iPhone and Android app is in [`mobile/`](mobile/README.md). It uses the same backend and the same `/api/*` endpoints as this website, and the cart syncs instantly between web and mobile. See [mobile/README.md](mobile/README.md) for how to open it and what to test.
+
 ---
 
 ## 1. Tech stack
@@ -69,7 +71,9 @@ kimkloset/
 │   ├── checkout/success/        # Verifies payment, shows confirmation
 │   ├── orders/page.tsx          # Order history (signed-in only)
 │   └── api/
-│       ├── checkout/route.ts            # Creates order + Paystack payment link
+│       ├── products, cart, orders/      # Shared API used by the website AND the mobile app
+│       ├── checkout/route.ts            # Creates order + Paystack payment link (web and mobile)
+│       ├── checkout/mobile-return/      # Paystack → confirm order → open the mobile app
 │       └── paystack/webhook/route.ts    # Backup payment confirmation from Paystack
 ├── components/                  # CartProvider, ProductCard, Catalog, CheckoutForm, LoginForm…
 ├── lib/
@@ -82,7 +86,8 @@ kimkloset/
 ├── middleware.ts                # Keeps login fresh, protects /checkout and /orders
 ├── public/products/             # Product photos
 ├── public/brand/                # Logo and wordmark
-└── supabase/                    # SQL to paste into Supabase
+├── supabase/                    # SQL to paste into Supabase
+└── mobile/                      # Stage 3: Expo app (see mobile/README.md)
 ```
 
 ## 5. Implementation plan
