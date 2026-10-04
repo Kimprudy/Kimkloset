@@ -35,6 +35,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.white } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="product/[slug]" />
+        <Stack.Screen name="checkout" />
         <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
         <Stack.Screen name="auth/callback" />
       </Stack>
