@@ -7,6 +7,7 @@ import { CormorantGaramond_600SemiBold, CormorantGaramond_700Bold } from '@expo-
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 
 import { AuthProvider } from '@/lib/auth';
+import { CartProvider } from '@/lib/cart';
 import { colors } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -29,12 +30,15 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
+      <CartProvider>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.white } }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="product/[slug]" />
         <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
         <Stack.Screen name="auth/callback" />
       </Stack>
+      </CartProvider>
     </AuthProvider>
   );
 }

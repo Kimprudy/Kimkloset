@@ -1,28 +1,52 @@
 import { router } from 'expo-router';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import AuthForm from '@/components/AuthForm';
+import { useCart } from '@/lib/cart';
+import { setPendingAdd, takePendingAdd } from '@/lib/pending-add';
 import { colors, fonts } from '@/lib/theme';
 
 /**
  * Slides up when a signed-out shopper taps "Add to cart".
- * (Step 6 adds the tapped item to the cart after they sign in.)
+ * After they sign in, the item they tapped is added to their cart.
  */
 export default function SignInModal() {
+  const { add } = useCart();
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
+
+  // Closed without signing in: forget the item
+  const cancel = () => {
+    setPendingAdd(null);
+    close();
+  };
+
+  async function handleSignedIn() {
+    const item = takePendingAdd();
+    close();
+    if (!item) return;
+    try {
+      await add(item);
+      Alert.alert('Added to your cart', `${item.name} is in your cart.`, [
+        { text: 'Keep shopping', style: 'cancel' },
+        { text: 'View cart', onPress: () => router.navigate('/cart') },
+      ]);
+    } catch (err) {
+      Alert.alert('Could not add to cart', err instanceof Error ? err.message : 'Please try again.');
+    }
+  }
 
   return (
     <KeyboardAvoidingView style={styles.wrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.top}>
         <Text style={styles.heading}>Sign in to continue</Text>
-        <Pressable onPress={close} hitSlop={12} accessibilityLabel="Close">
+        <Pressable onPress={cancel} hitSlop={12} accessibilityLabel="Close">
           <Ionicons name="close" size={26} color={colors.ink} />
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.sub}>Your cart is saved to your account, so it&apos;s the same on the website and the app.</Text>
-        <AuthForm onSuccess={close} />
+        <AuthForm onSuccess={handleSignedIn} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

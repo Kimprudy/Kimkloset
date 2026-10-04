@@ -1,32 +1,99 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import ProductCard from '@/components/ProductCard';
 import StateView from '@/components/StateView';
-import { api } from '@/lib/api';
-import { API_URL, formatNaira } from '@/lib/config';
+import { CATEGORIES } from '@/lib/config';
+import { cachedProducts, fetchProducts } from '@/lib/products';
 import { colors, fonts } from '@/lib/theme';
 import type { Product } from '@/lib/types';
 
-// Step 4: proves the app can reach the shared API. The real shop grid comes in Step 6.
 export default function ShopScreen() {
-  const [products, setProducts] = useState<Product[] | null>(null);
+  const [products, setProducts] = useState<Product[] | null>(cachedProducts);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [category, setCategory] = useState('All');
+  const [query, setQuery] = useState('');
 
-  const fetchProducts = useCallback(() => {
-    api<{ products: Product[] }>('/api/products')
-      .then(({ products }) => setProducts(products))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load products.'));
-  }, []);
+  const load = useCallback(
+    () =>
+      fetchProducts()
+        .then((p) => {
+          setProducts(p);
+          setError(null);
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : 'Could not load products.')),
+    []
+  );
 
-  useEffect(fetchProducts, [fetchProducts]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const retry = () => {
     setError(null);
     setProducts(null);
-    fetchProducts();
+    void load();
   };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    void load().finally(() => setRefreshing(false));
+  };
+
+  // Known categories first (only if they have products), then any new category added in Supabase
+  const tabs = useMemo(() => {
+    const list = products ?? [];
+    return ['All', ...new Set([...CATEGORIES.filter((c) => list.some((p) => p.category === c)), ...list.map((p) => p.category)])];
+  }, [products]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (products ?? []).filter(
+      (p) =>
+        (category === 'All' || p.category === category) &&
+        (!q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || p.description.toLowerCase().includes(q))
+    );
+  }, [products, category, query]);
+
+  // Odd number of pieces: add an empty cell so the last card stays half width
+  const grid: (Product | null)[] = filtered.length % 2 ? [...filtered, null] : filtered;
+
+  const header = (
+    <View style={styles.controls}>
+      <View style={styles.search}>
+        <Ionicons name="search" size={18} color={colors.inkFaint} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search dresses, sets, tops…"
+          placeholderTextColor={colors.inkFaint}
+          style={styles.searchInput}
+          returnKeyType="search"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+        />
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        {tabs.map((t) => (
+          <Pressable
+            key={t}
+            onPress={() => setCategory(t)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: category === t }}
+            style={[styles.chip, category === t && styles.chipActive]}>
+            <Text style={[styles.chipText, category === t && { color: colors.white }]}>{t}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+      <Text style={styles.count}>
+        {filtered.length} {filtered.length === 1 ? 'piece' : 'pieces'}
+      </Text>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -35,29 +102,40 @@ export default function ShopScreen() {
         <Text style={styles.tagline}>Online Fashion Store</Text>
       </View>
 
-      {error ? (
+      {error && !products ? (
         <StateView kind="error" title="Couldn't reach the shop" message={error} actionLabel="Try again" onAction={retry} />
       ) : !products ? (
         <StateView kind="loading" message="Loading the collection…" />
-      ) : products.length === 0 ? (
-        <StateView kind="empty" title="No pieces yet" message="New arrivals are coming soon." />
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
-          <View style={styles.okBox}>
-            <Text style={styles.okTitle}>✓ Connected</Text>
-            <Text style={styles.okText}>
-              {products.length} products loaded from {API_URL.replace('https://', '')}/api/products
-            </Text>
-          </View>
-          {products.map((p) => (
-            <View key={p.id} style={styles.row}>
-              <Text style={styles.name} numberOfLines={1}>
-                {p.name}
-              </Text>
-              <Text style={styles.price}>{formatNaira(p.price)}</Text>
-            </View>
-          ))}
-        </ScrollView>
+        <FlatList
+          data={grid}
+          keyExtractor={(p) => p?.id ?? 'spacer'}
+          numColumns={2}
+          renderItem={({ item }) => (item ? <ProductCard product={item} /> : <View style={{ flex: 1 }} />)}
+          ListHeaderComponent={header}
+          ListEmptyComponent={
+            products.length === 0 ? (
+              <StateView kind="empty" title="No pieces yet" message="New arrivals are coming soon." />
+            ) : (
+              <StateView
+                kind="empty"
+                icon="search-outline"
+                title="No matches"
+                message="Try a different word or category."
+                actionLabel="Clear filters"
+                onAction={() => {
+                  setQuery('');
+                  setCategory('All');
+                }}
+              />
+            )
+          }
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.pinkDeep} />}
+        />
       )}
     </SafeAreaView>
   );
@@ -65,14 +143,25 @@ export default function ShopScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
-  header: { alignItems: 'center', paddingTop: 8, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  header: { alignItems: 'center', paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   wordmark: { width: 170, height: 24 },
   tagline: { marginTop: 4, fontFamily: fonts.body, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: colors.inkFaint },
-  list: { padding: 16, gap: 8 },
-  okBox: { backgroundColor: colors.successSoft, borderRadius: 16, padding: 14, marginBottom: 8 },
-  okTitle: { fontFamily: fonts.bodyBold, color: colors.success, fontSize: 15 },
-  okText: { fontFamily: fonts.body, color: colors.success, fontSize: 13, marginTop: 2 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  name: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.ink },
-  price: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink },
+  controls: { gap: 12, paddingTop: 14, paddingBottom: 4 },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+  },
+  searchInput: { flex: 1, paddingVertical: 11, fontFamily: fonts.body, fontSize: 15, color: colors.ink },
+  chips: { gap: 8, paddingRight: 16 },
+  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  chipActive: { backgroundColor: colors.pinkDeep, borderColor: colors.pinkDeep },
+  chipText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.ink },
+  count: { fontFamily: fonts.body, fontSize: 12, color: colors.inkFaint },
+  list: { paddingHorizontal: 16, paddingBottom: 32, gap: 20, flexGrow: 1 },
+  row: { gap: 12 },
 });
