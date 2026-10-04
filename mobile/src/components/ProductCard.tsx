@@ -17,7 +17,7 @@ export default function ProductCard({ product }: { product: Product }) {
             source={imageUrl(product.image_url)}
             style={[styles.image, soldOut && { opacity: 0.5 }]}
             contentFit="cover"
-            contentPosition={{ top: '30%', left: '50%' }}
+            contentPosition="top"
             transition={200}
             recyclingKey={product.id}
           />
@@ -35,7 +35,8 @@ export default function ProductCard({ product }: { product: Product }) {
 
 const styles = StyleSheet.create({
   card: { flex: 1 },
-  imageWrap: { aspectRatio: 3 / 4, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.pinkSoft },
+  // Product photos are tall (about 9:16), so the card matches them and shows the whole outfit
+  imageWrap: { aspectRatio: 9 / 16, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.pinkSoft },
   image: { width: '100%', height: '100%' },
   category: {
     position: 'absolute',
