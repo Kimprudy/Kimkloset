@@ -19,10 +19,6 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       "expo-router",
       [
@@ -51,6 +47,10 @@
     },
     "updates": {
       "url": "https://u.expo.dev/74584ad1-c589-41aa-8766-00d71a741730"
-    }
+    },
+    "platforms": [
+      "ios",
+      "android"
+    ]
   }
 }
