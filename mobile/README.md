@@ -9,7 +9,7 @@ Built with Expo SDK 57 (React Native, TypeScript, expo-router) and Supabase.
 | Phone | How |
 |---|---|
 | **Android** | Open **https://expo.dev/accounts/kimprudy/projects/kimkloset/builds/f7741c5f-03ae-4161-9ffa-ec8c0e5c2e08** on the phone and tap **Install** (or scan its QR code), or download the APK directly: https://expo.dev/artifacts/eas/TW-BKja6UPWWfBkRUaOAYJKqv1vuoOtJpMq4mk5ZnN4.apk. Allow "install unknown apps" when Android asks. |
-| **iPhone or Android, with Expo Go** | Install **Expo Go** from the App Store / Play Store. On the phone, copy this link, paste it into the browser's address bar (Safari on iPhone) and tap **Open in Expo Go**: `exp://u.expo.dev/74584ad1-c589-41aa-8766-00d71a741730?channel-name=preview`. It always opens the latest version. (The [update page](https://expo.dev/accounts/kimprudy/projects/kimkloset/updates/2ddf9ac2-91e3-4577-9dc1-0d9dc2664270) only shows details; it doesn't open the app.) |
+| **iPhone or Android, with Expo Go** | Install **Expo Go** from the App Store / Play Store. On the phone, copy this link, paste it into the browser's address bar (Safari on iPhone) and tap **Open in Expo Go**: `exp://u.expo.dev/74584ad1-c589-41aa-8766-00d71a741730?channel-name=preview`. It always opens the latest version. (The [update page](https://expo.dev/accounts/kimprudy/projects/kimkloset/updates/d79d9548-c101-47bf-a811-73e55e5243b4) only shows details; it doesn't open the app.) |
 
 Test payment (Paystack test mode): card `4084 0840 8408 4081`, any future expiry, CVV `408`, PIN `0000`, OTP `123456`. On Paystack's test page you can also simply choose **Success**.
 

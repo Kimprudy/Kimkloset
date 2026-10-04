@@ -43,7 +43,7 @@
     },
     "owner": "kimprudy",
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "sdkVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/74584ad1-c589-41aa-8766-00d71a741730"
