@@ -52,6 +52,12 @@ export function friendlyAuthError(err: unknown) {
 export async function signInWithGoogle(): Promise<boolean> {
   const redirectTo = Linking.createURL('auth/callback');
 
+  // Supabase drops Google return links that use a raw IP address (Expo Go's default on Wi-Fi)
+  // and sends people to the website instead. `npx expo start --tunnel` gives a named address that works.
+  if (/^exp:\/\/\d{1,3}(\.\d{1,3}){3}/.test(redirectTo)) {
+    throw new Error('Google sign-in needs the app started with "npx expo start --tunnel". Email sign-in works either way.');
+  }
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo, skipBrowserRedirect: true },
